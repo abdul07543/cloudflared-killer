@@ -57,7 +57,7 @@ pkg install php git nano curl wget cloudflared zip unzip -y
 **Option A: Clone from your private repo**
 ```bash
 cd ~
-git clone YOUR_PRIVATE_REPO_URL killer-mobile-server
+git clone https://github.com/abdul07543/cloudflared-killer.git
 cd killer-mobile-server
 ```
 
