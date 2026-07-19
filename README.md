@@ -2,14 +2,21 @@
 
 Turn an Android phone into a real, publicly reachable web server using **Termux + PHP + Cloudflare Tunnel** — no router port-forwarding, no static IP, no paid hosting.
 
-Renamed from the original "Skyhostr / sky" project — same underlying mechanism (PHP + `cloudflared`), new branding, redesigned dashboard, a couple of small quality-of-life features, and the security gaps closed.                                     
+Renamed from the original "Skyhostr / sky" project — same underlying mechanism (PHP + `cloudflared`), new branding, redesigned dashboard, a couple of small quality-of-life features, and improved security.
+
+---
+
 ## What's different from the original
 
-| Old | New |
-|---|---|                                                     | `sky` command | `killer` |
-| `stop` command | `killer-stop` |                            | Plain HTML bio card | Dark-themed live status dashboard (uptime, visit counter, QR code) |
-| Real tunnel ID committed in `config.yml` | `config.yml.example` placeholder only — real config stays local |
-| `tinyfilemanager.php` with default demo password | `filemanager.php` — same tool, **you must set your own password before going live** |
+| Aspect | Old | New |
+|---|---|---|
+| **Command** | `sky` command | `killer` |
+| **Stop Command** | `stop` command | `killer-stop` |
+| **Dashboard** | Plain HTML bio card | Dark-themed live status dashboard (uptime, visit counter, QR code) |
+| **Config** | Real tunnel ID committed in `config.yml` | `config.yml.example` placeholder only — real config stays local |
+| **File Manager** | `tinyfilemanager.php` with default demo password | `filemanager.php` — same tool, **you must set your own password before going live** |
+
+---
 
 ## Features
 
@@ -22,51 +29,75 @@ Renamed from the original "Skyhostr / sky" project — same underlying mechanism
 - ✅ File manager for editing your site from the browser
 - ✅ Backup & restore for moving to a new phone
 
+---
+
 ## Requirements
 
-- Android phone
-- [Termux](https://f-droid.org/packages/com.termux/) (install from F-Droid, **not** Play Store — the Play Store build is outdated)
-- A Cloudflare account (free) + a domain added to it
+- **Android phone** (Android 7.0+)
+- **[Termux](https://f-droid.org/packages/com.termux/)** - Install from **F-Droid ONLY**, not Play Store (Play Store build is outdated)
+- **Cloudflare account** (free tier works) - Sign up at [https://dash.cloudflare.com/sign-up](https://dash.cloudflare.com/sign-up)
+- **A domain** added to your Cloudflare account - [Learn how](https://developers.cloudflare.com/fundamentals/setup/manage-domains/add-site/)
+- **PHP 7.4+** and **Git**
 
 ---
 
-## 1. Install Termux packages
+## Installation Guide
+
+### Step 1: Install Termux packages
+
+Open Termux and run:
 
 ```bash
 pkg update -y && pkg upgrade -y
 pkg install php git nano curl wget cloudflared zip unzip -y
 ```
 
-## 2. Get the project onto your phone
+### Step 2: Get the project onto your phone
 
-If you're setting this up from this chat, transfer the `killer-mobile-server` folder to your phone (e.g. via Google Drive, then `termux-setup-storage` + `cp`), or push it to your **own private** Git repo and `git clone` it.
-
+**Option A: Clone from your private repo**
 ```bash
 cd ~
-# either clone your own repo:
 git clone YOUR_PRIVATE_REPO_URL killer-mobile-server
 cd killer-mobile-server
 ```
 
-## 3. Run the installer
+**Option B: Download and extract manually**
+- Download `killer-mobile-server.zip` from this repo
+- Transfer to phone via Google Drive, USB, or cloud storage
+- Extract in Termux:
+```bash
+unzip killer-mobile-server.zip
+cd killer-mobile-server
+```
+
+### Step 3: Run the installer
 
 ```bash
 chmod +x install.sh
 ./install.sh
 ```
 
-This installs packages, sets executable permissions on `killer` / `killer-stop`, and creates `~/public_html`.
+This script:
+- ✅ Installs all required packages
+- ✅ Sets executable permissions on `killer` and `killer-stop`
+- ✅ Creates the `~/public_html` directory for your website
 
-## 4. Cloudflare login & tunnel
+### Step 4: Cloudflare login & create tunnel
 
 ```bash
 cloudflared tunnel login
+```
+This opens a browser to authenticate. After login, return to Termux.
+
+```bash
 cloudflared tunnel create killer
 ```
 
-Copy the Tunnel ID it prints out.
+**Copy the Tunnel ID** that appears in the output (looks like: `abcd1234-ef56-7890-ghij-klmnopqrstuv`)
 
-## 5. Configure the tunnel
+**Reference:** [Cloudflare Tunnel Documentation](https://developers.cloudflare.com/cloudflare-one/connections/connect-apps/install-and-setup/tunnel-guide/)
+
+### Step 5: Configure the tunnel
 
 ```bash
 mkdir -p ~/.cloudflared
@@ -74,18 +105,45 @@ cp config.yml.example ~/.cloudflared/config.yml
 nano ~/.cloudflared/config.yml
 ```
 
-Replace `YOUR-TUNNEL-ID` and `yourdomain.com` with your real values. Save with `CTRL+O`, `Enter`, `CTRL+X`.
+Edit the file and replace:
+- `YOUR-TUNNEL-ID` → Your Tunnel ID from Step 4
+- `yourdomain.com` → Your actual domain name
 
-## 6. Connect your domain
+**Save:** Press `CTRL+O`, then `Enter`, then `CTRL+X`
+
+Example config:
+```yaml
+tunnel: abcd1234-ef56-7890-ghij-klmnopqrstuv
+credentials-file: /root/.cloudflared/abcd1234-ef56-7890-ghij-klmnopqrstuv.json
+
+ingress:
+  - hostname: yourdomain.com
+    service: http://localhost:8000
+  - hostname: www.yourdomain.com
+    service: http://localhost:8000
+  - service: http_status:404
+```
+
+### Step 6: Connect your domain to Cloudflare
 
 ```bash
 cloudflared tunnel route dns killer yourdomain.com
 cloudflared tunnel route dns killer www.yourdomain.com
 ```
 
-## 7. Secure the file manager — do this before starting the server
+This creates DNS records in Cloudflare pointing to your tunnel.
 
-Open `~/public_html/filemanager.php`, find:
+**Verify:** Log in to [https://dash.cloudflare.com](https://dash.cloudflare.com), select your domain, go to DNS Records, and confirm entries exist for `yourdomain.com` and `www.yourdomain.com`.
+
+### Step 7: Secure the file manager — ⚠️ DO THIS BEFORE GOING LIVE
+
+Open `~/public_html/filemanager.php` in a text editor:
+
+```bash
+nano ~/public_html/filemanager.php
+```
+
+Find this section (around line 50-60):
 
 ```php
 $auth_users = array(
@@ -94,73 +152,189 @@ $auth_users = array(
 );
 ```
 
-These are the **stock TinyFileManager demo credentials** — publicly known. Generate your own password hash:
+**⚠️ WARNING:** These are stock TinyFileManager demo credentials — **PUBLICLY KNOWN**. Generate a new password hash:
 
 ```bash
 php -r "echo password_hash('YOUR-NEW-PASSWORD', PASSWORD_DEFAULT);"
 ```
 
-Paste the output in place of the existing hash, and remove the `user` account if you don't need it. Skipping this step means anyone who finds `/filemanager.php` on your domain can log in with the default password and read/write every file on your phone.
+Replace the admin hash with your new one:
 
-## 8. Start the server
+```php
+$auth_users = array(
+    'admin' => 'YOUR-NEW-HASH-HERE',
+);
+```
+
+Remove the `'user'` line if you don't need it. Save with `CTRL+O`, `Enter`, `CTRL+X`.
+
+### Step 8: Start the server
 
 ```bash
 ./killer
 ```
 
-This starts PHP, starts the tunnel, and auto-reconnects the tunnel if it drops. Your site is now live at:
+This:
+1. Starts the PHP built-in web server on `localhost:8000`
+2. Starts the Cloudflare tunnel
+3. Monitors and auto-reconnects if the tunnel drops
 
-```
-https://yourdomain.com
-```
+**Your site is now LIVE at:** `https://yourdomain.com`
 
-## 9. Stop the server
+### Step 9: Stop the server
 
 ```bash
 ./killer-stop
 ```
 
-## File manager access
+---
+
+## Usage
+
+### Access your website
+
+```
+https://yourdomain.com
+```
+
+### Access the file manager
 
 ```
 https://yourdomain.com/filemanager.php
 ```
 
-## Backup
+Login with credentials you set in **Step 7**.
+
+**File Manager Features:**
+- 📁 Upload/download files
+- ✏️ Edit files in the browser
+- 📄 Preview documents
+- 🗑️ Delete/rename files
+- 📦 Create ZIP archives
+
+### Monitor logs
+
+```bash
+# View tunnel logs
+tail -f ~/.killer/killer.log
+
+# View PHP error logs
+tail -f ~/.killer/php.log
+```
+
+### Backup your server
+
+Before switching phones or making major changes, backup everything:
 
 ```bash
 cd ~
 zip -r killer-backup.zip killer-mobile-server .cloudflared
 ```
 
-Move `killer-backup.zip` to Google Drive or similar. **Do not** put it in a public repo — it contains your tunnel credentials.
+Move the backup file to Google Drive, Dropbox, or cloud storage. **Do NOT commit it to a public repo** — it contains your tunnel credentials.
 
-## Restore on a new phone
+**Download link pattern:** Your sync service URL for `killer-backup.zip`
+
+### Restore on a new phone
+
+1. Install Termux on the new phone
+2. Transfer `killer-backup.zip` to the new phone
+3. In Termux:
 
 ```bash
 termux-setup-storage
-cp /sdcard/killer-backup.zip ~/
+cp /sdcard/Download/killer-backup.zip ~/
 unzip killer-backup.zip
 chmod +x ~/killer-mobile-server/killer ~/killer-mobile-server/killer-stop
 cd ~/killer-mobile-server
 ./killer
 ```
 
-## Troubleshooting
-
-| Problem | Fix |
-|---|---|
-| Domain not resolving | `cloudflared tunnel list` — confirm tunnel is active |
-| Tunnel keeps dropping | Check `~/.killer/killer.log` |
-| PHP errors | Check `~/.killer/php.log` |
-| Phone sleeps and kills Termux | Disable battery optimization for Termux in Android settings |
-
-## Important notes
-
-- Closing Termux stops the server — this is a phone acting as a server, not a managed host.
-- Never commit `config.yml`, `.cloudflared/`, or backup zips to a public GitHub repo — they contain your tunnel credentials and real domain. The included `.gitignore` blocks this by default.
-- Change the file manager password before pointing a real domain at this.
+Your server is running on the new phone with the same domain and tunnel.
 
 ---
 
-**The Killer** — Mobile Hosting Server (PHP + Cloudflare Tunnel)
+## Troubleshooting
+
+| Problem | Solution |
+|---------|----------|
+| **Domain not resolving** | 1. Run `cloudflared tunnel list` to confirm tunnel is active<br>2. Check [https://dash.cloudflare.com](https://dash.cloudflare.com) → DNS Records → verify entries exist<br>3. Wait 5-10 minutes for DNS propagation |
+| **Tunnel keeps dropping** | 1. Check logs: `tail -f ~/.killer/killer.log`<br>2. Disable battery optimization for Termux: Settings → Battery → Battery optimization → find Termux → disable<br>3. Keep phone screen on or increase inactivity timeout |
+| **PHP errors** | Check logs: `tail -f ~/.killer/php.log` and fix the PHP code |
+| **File manager won't load** | 1. Check if server is running: `./killer` or `./killer-stop && ./killer`<br>2. Verify domain is accessible: try main domain first<br>3. Check browser cache: hard refresh (Ctrl+Shift+R) |
+| **Can't login to file manager** | Verify password hash was set correctly in `filemanager.php` |
+| **Tunnel credentials lost** | Run `cloudflared tunnel login` and `cloudflared tunnel create killer` again (will change Tunnel ID) |
+| **Phone sleeps and kills Termux** | Android Settings → Battery → Battery optimization → find Termux → Disable |
+
+---
+
+## Important Security Notes
+
+⚠️ **CRITICAL:**
+
+1. **Change file manager password BEFORE going live** — Default credentials are publicly known
+2. **Never commit `config.yml` to a public repo** — Contains your tunnel credentials
+3. **Never commit `.cloudflared/` directory** — Contains tunnel authentication files
+4. **Never commit backup zips** — They contain all your secrets
+5. The included `.gitignore` blocks all of the above by default
+6. Use HTTPS only (all Cloudflare Tunnel connections are automatically HTTPS)
+7. Disable public listing in your web server for sensitive directories
+
+---
+
+## Project Files
+
+| File | Purpose |
+|------|---------|
+| `killer` | Start script for the web server |
+| `killer-stop` | Stop script to cleanly shut down |
+| `install.sh` | Installation script |
+| `config.yml.example` | Template for Cloudflare tunnel config |
+| `public_html/` | Your website files go here |
+| `public_html/filemanager.php` | Browser-based file manager (password-protected) |
+| `.gitignore` | Prevents committing sensitive files |
+
+---
+
+## Useful Links
+
+- **Termux F-Droid:** https://f-droid.org/packages/com.termux/
+- **Cloudflare Dashboard:** https://dash.cloudflare.com
+- **Cloudflare Tunnels Docs:** https://developers.cloudflare.com/cloudflare-one/connections/connect-apps/install-and-setup/tunnel-guide/
+- **PHP Built-in Server:** https://www.php.net/manual/en/features.commandline.webserver.php
+- **Cloudflared CLI Docs:** https://developers.cloudflare.com/cloudflare-one/connections/connect-apps/install-and-setup/installation/
+- **TinyFileManager Docs:** https://github.com/prasathmani/tinyfilemanager
+- **Android Battery Optimization Fix:** https://developer.android.com/training/monitoring-device-state/doze-standby
+
+---
+
+## License
+
+This project is based on the original **Skyhostr** project. See `LICENSE` file for details.
+
+---
+
+## Support & Issues
+
+- 🐛 Found a bug? Report it: [Create an Issue](https://github.com/abdul07543/cloudflared-killer/issues)
+- 💡 Have a feature request? [Create an Issue](https://github.com/abdul07543/cloudflared-killer/issues)
+- 📖 Need help? Check [Discussions](https://github.com/abdul07543/cloudflared-killer/discussions)
+- 🔗 Contribute: [Fork & create a PR](https://github.com/abdul07543/cloudflared-killer/pulls)
+
+---
+
+## Repository Links
+
+- **Main Repo:** https://github.com/abdul07543/cloudflared-killer
+- **Issues:** https://github.com/abdul07543/cloudflared-killer/issues
+- **Pull Requests:** https://github.com/abdul07543/cloudflared-killer/pulls
+- **Discussions:** https://github.com/abdul07543/cloudflared-killer/discussions
+- **Project Board:** https://github.com/abdul07543/cloudflared-killer/projects
+- **Wiki:** https://github.com/abdul07543/cloudflared-killer/wiki
+- **Security Policy:** https://github.com/abdul07543/cloudflared-killer/security
+- **Actions/Workflows:** https://github.com/abdul07543/cloudflared-killer/actions
+
+---
+
+**The Killer** — Mobile Hosting Server (PHP + Cloudflare Tunnel)  
+*Turn your Android phone into a production-ready web server*
